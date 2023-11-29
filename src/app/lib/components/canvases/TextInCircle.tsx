@@ -11,7 +11,11 @@ type CanvasProps = {
   width: number;
   height: number;
 };
-
+/**
+ * From [Mike Bostock's Tutorial](https://observablehq.com/@mbostock/fit-text-to-circle).
+ * 
+ * Related to [Issue #433 on React Force Graph](https://github.com/vasturiano/react-force-graph/issues/433#issuecomment-1810210106).
+ */
 export function TextInCircle({
   width,
   height,
