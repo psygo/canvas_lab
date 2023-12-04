@@ -1,4 +1,4 @@
-import { TextInCircle } from "@components/canvases/exports";
+import { TextInCircle } from "@components/fit_text_to_circle/exports";
 
 export default function Home() {
   return (
