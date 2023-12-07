@@ -7,6 +7,12 @@ import {
   setupGridWidthHeightAndScale,
 } from "../utils/canvas_utils";
 
+const LINE_CUT = 3; // Must be 2 or greater. This affects when a new line is created.
+// The larger the value the more often a new line will be added.
+const DEFAULT_FONT_SIZE = 64; // In pixels. Font is scaled to fit so that font size remains constant
+const MAX_SCALE = 2; // Max font scale used
+const DEFAULT_FONT_HEIGHT = DEFAULT_FONT_SIZE * 1.2;
+
 type CanvasProps = {
   width: number;
   height: number;
@@ -29,31 +35,15 @@ export function TextInCircle({
     return canvas.getContext("2d")!;
   }
 
+  const RADIUS = width * 0.45;
+  const INSET = width * 0.015;
+  const CENTER_X = width * 0.5;
+  const CENTER_Y = width * 0.5;
+
   useEffect(() => {
     const canvas = canvasRef.current!;
     setupGridWidthHeightAndScale(width, height, canvas);
-
-    // const ctx = getContext();
-
-    // // Background
-    // ctx.fillStyle = "black";
-    // ctx.fillRect(0, 0, width, height);
-
-    // // Circle
-    // ctx.beginPath();
-    // ctx.arc(width / 2, height / 2, 100, 0, TwoPI);
-    // ctx.closePath();
-
-    // // Fill the Circle
-    // ctx.fillStyle = "white";
-    // ctx.fill();
-  }, [width, height]);
-
-  const textHeight = 15;
-  const lineHeight = textHeight + 5;
-  const cx = 150;
-  const cy = 150;
-  const r = 100;
+  }, [height, width]);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement>
@@ -61,197 +51,198 @@ export function TextInCircle({
     const ctx = getContext();
 
     const text = e.target.value; // This gives out an error
-    // "'Twas the night before Christmas, when all through the house,  Not a creature was stirring, not even a mouse.  And so begins the story of the day of";
 
-    const lines = initLines();
-    wrapText(text, lines);
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2, false);
-    ctx.closePath();
-    ctx.strokeStyle = "skyblue";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    fitCircleText(
+      ctx,
+      CENTER_X,
+      CENTER_Y,
+      RADIUS,
+      INSET,
+      text
+    );
   }
 
-  // pre-calculate width of each horizontal chord of the circle
-  // This is the max width allowed for text
-
-  function initLines() {
-    const lines: any[] = [];
-
-    for (let y = r * 0.9; y > -r; y -= lineHeight) {
-      let h = Math.abs(r - y);
-
-      if (y - lineHeight < 0) {
-        h += 20;
-      }
-
-      let length = 2 * Math.sqrt(h * (2 * r - h));
-
-      if (length && length > 10) {
-        lines.push({
-          y: y,
-          maxLength: length,
-        });
-      }
-    }
-
-    return lines;
-  }
-
-  // draw text on each line of the circle
-
-  function wrapText(text: string, lines: any[]) {
-    const ctx = getContext();
-
-    let i = 0;
-    let words = text.split(" ");
-
-    while (i < lines.length && words.length > 0) {
-      let line = lines[i++];
-
-      let lineData = calcAllowableWords(
-        line.maxLength,
-        words
-      );
-
-      ctx.fillText(
-        lineData!.text,
-        cx - lineData!.width / 2,
-        cy - line.y + textHeight
-      );
-
-      words.splice(0, lineData!.count);
-    }
-  }
-
-  // calculate how many words will fit on a line
-
-  function calcAllowableWords(
-    maxWidth: number,
-    words: any[]
+  function fillWord(
+    ctx: CanvasRenderingContext2D,
+    word: any,
+    x: number,
+    y: number
   ) {
-    const ctx = getContext();
+    // render a word
+    ctx.fillText(word.text, x, y);
+    return x + word.width;
+  }
 
-    let wordCount = 0;
-    let testLine = "";
-    let spacer = "";
-    let fittedWidth = 0;
-    let fittedText = "";
-
-    const font = "12pt verdana";
-    ctx.font = font;
-
-    for (let i = 0; i < words.length; i++) {
-      testLine += spacer + words[i];
-      spacer = " ";
-
-      let width = ctx.measureText(testLine).width;
-
-      if (width > maxWidth) {
-        return {
-          count: i,
-          width: fittedWidth,
-          text: fittedText,
-        };
-      }
-
-      fittedWidth = width;
-      fittedText = testLine;
+  function fillLine(
+    ctx: CanvasRenderingContext2D,
+    words: any,
+    line: any
+  ) {
+    // render a line
+    var idx = line.from;
+    var x = line.x;
+    while (idx < line.to) {
+      const word = words[idx++];
+      x = fillWord(ctx, word, x, line.y);
+      x += word.space;
     }
   }
-  // function handleChange(
-  //   e: React.ChangeEvent<HTMLInputElement>
-  // ) {
-  //   const newText = e.target.value;
-  //   setText(newText);
 
-  //   // Split Words
-  //   const words = text.split(/\s+/g); // To hyphenate: /\s+|(?<=-)/
-  //   if (!words[words.length - 1]) words.pop();
-  //   if (!words[0]) words.shift();
+  function getCharWidth(
+    words: any,
+    fromIdx: any,
+    toIdx: any
+  ) {
+    // in characters
+    var width = 0;
+    while (fromIdx < toIdx) {
+      width +=
+        words[fromIdx].text.length +
+        (fromIdx++ < toIdx ? 1 : 0);
+    }
+    return width;
+  }
 
-  //   // Get Width
-  //   const lineHeight = 12;
-  //   const targetWidth = Math.sqrt(
-  //     measureWidth(text.trim()) * lineHeight
-  //   );
+  function getWordsWidth(words: any, line: any) {
+    // in pixels
+    var width = 0;
+    var idx = line.from;
+    while (idx < line.to) {
+      width +=
+        words[idx].width +
+        (idx++ < line.to ? words[idx - 1].space : 0);
+    }
+    return width;
+  }
 
-  //   // Split Lines accordingly
-  //   const lines = splitLines(targetWidth, words);
+  function fitCircleText(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    radius: number,
+    inset = 20,
+    text = "",
+    font = "arial",
+    circleColor = "#C45",
+    fontColor = "#EEE"
+  ) {
+    let scale, line;
+    ctx.fillStyle = circleColor;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    text = (text?.toString?.() ?? "").trim();
 
-  //   console.log(targetWidth);
-  //   console.log(lines);
+    if (text) {
+      ctx.fillStyle = fontColor;
+      ctx.font = DEFAULT_FONT_SIZE + "px " + font;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
 
-  //   // Get radius so we can scale
-  //   const radius = getRadius(lines, lineHeight);
+      const spaceWidth = ctx.measureText(" ").width;
+      const words = text
+        .split(" ")
+        .map((text, i, words) => ({
+          width: ctx.measureText(text).width,
+          text,
+          space: i < words.length - 1 ? spaceWidth : 0,
+        }));
+      const lines = [];
+      const totalWidth = ctx.measureText(text).width;
+      const circleWidth = (radius - inset) * 2;
+      scale = Math.min(MAX_SCALE, circleWidth / totalWidth);
+      const wordCount = words.length;
 
-  //   // Draw Text
-  //   const ctx = getContext();
+      // If single line can not fit
+      if (scale < MAX_SCALE && words.length > 1) {
+        // split lines and get bounding radius
+        let lineCount = Math.ceil(Math.sqrt(words.length));
+        let lineIdx = 0;
+        let fromWord = 0;
+        let toWord = 1;
 
-  //   ctx.textAlign = "center";
-  //   ctx.fillStyle = "black";
-  //   for (const [i, l] of lines.entries()) {
-  //     ctx.fillText(
-  //       l.text,
-  //       width / 2 - l.width / 2,
-  //       height / 2 + i * lineHeight
-  //     );
-  //   }
-  // }
+        // get a set of lines approx the same character count
+        while (fromWord < wordCount) {
+          let lineCharCount = getCharWidth(
+            words,
+            fromWord,
+            toWord
+          );
+          while (
+            toWord < wordCount &&
+            lineCharCount <
+              text.length / (lineCount + LINE_CUT)
+          ) {
+            lineCharCount = getCharWidth(
+              words,
+              fromWord,
+              toWord++
+            );
+          }
+          lines.push(
+            (line = {
+              x: 0,
+              y: 0,
+              idx: lineIdx++,
+              from: fromWord,
+              to: toWord,
+            })
+          );
+          fromWord = toWord;
+          toWord = fromWord + 1;
+        }
 
-  // function measureWidth(s: string) {
-  //   const ctx = getContext();
-  //   return ctx.measureText(s).width;
-  // }
+        // find the bounding circle radius of lines
+        let boundRadius = -Infinity;
+        lineIdx = 0;
+        for (const line of lines) {
+          const lineWidth =
+            getWordsWidth(words, line) * 0.5;
+          const lineHeight =
+            (-(lineCount - 1) * 0.5 + lineIdx) *
+            DEFAULT_FONT_HEIGHT; // to middle of line
+          const lineTop =
+            lineHeight - DEFAULT_FONT_HEIGHT * 0.5;
+          const lineBottom =
+            lineHeight + DEFAULT_FONT_HEIGHT * 0.5;
+          boundRadius = Math.max(
+            Math.hypot(lineWidth, lineTop),
+            Math.hypot(lineWidth, lineBottom),
+            boundRadius
+          );
+          lineIdx++;
+        }
 
-  // function splitLines(
-  //   targetWidth: number,
-  //   words: string[]
-  // ) {
-  //   let line;
-  //   let lineWidth0 = Infinity;
-  //   const lines = [];
+        // use bounding radius to scale and then fit each line
+        scale = (radius - inset) / (boundRadius + inset);
+        lineIdx = 0;
+        for (const line of lines) {
+          line.y =
+            (-(lines.length - 1) * 0.5 + lineIdx) *
+            DEFAULT_FONT_HEIGHT;
+          line.x = -getWordsWidth(words, line) * 0.5;
+          lineIdx++;
+        }
+      } else {
+        lines.push({
+          x: 0,
+          y: 0,
+          from: 0,
+          to: words.length,
+        });
+        lines[0].x = -getWordsWidth(words, lines[0]) * 0.5;
+      }
 
-  //   for (let i = 0, n = words.length; i < n; ++i) {
-  //     let lineText1 =
-  //       (line ? line.text + " " : "") + words[i];
+      // Scale and render all lines
+      ctx.setTransform(scale, 0, 0, scale, cx, cy);
+      lines.forEach((line) => {
+        fillLine(ctx, words, line);
+      });
 
-  //     let lineWidth1 = measureWidth(lineText1);
-
-  //     if ((lineWidth0 + lineWidth1) / 2 < targetWidth) {
-  //       line!.width = lineWidth0 = lineWidth1;
-  //       line!.text = lineText1;
-  //     } else {
-  //       lineWidth0 = measureWidth(words[i]);
-  //       line = { width: lineWidth0, text: words[i] };
-  //       lines.push(line);
-  //     }
-  //   }
-  //   return lines;
-  // }
-
-  // function getRadius(
-  //   lines: { width: number; text: string }[],
-  //   lineHeight: number
-  // ) {
-  //   let radius = 0;
-
-  //   for (let i = 0, n = lines.length; i < n; ++i) {
-  //     const dy =
-  //       (Math.abs(i - n / 2 + 0.5) + 0.5) * lineHeight;
-
-  //     const dx = lines[i].width / 2;
-
-  //     radius = Math.max(
-  //       radius,
-  //       Math.sqrt(dx ** 2 + dy ** 2)
-  //     );
-  //   }
-
-  //   return radius;
-  // }
+      // restore default
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+  }
 
   return (
     <>
