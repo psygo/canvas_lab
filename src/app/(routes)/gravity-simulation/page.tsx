@@ -31,52 +31,45 @@ export default function GravitySimulation({
   });
 
   const sphereRadius = 10;
+  const defaultDelta = 0.5;
 
-  const tick = useCallback(
-    (delta: Delta = { x: 0.1, y: 0 }) => {
-      setCurrentPos((p) => ({ x: p.x + delta.x, y: p.y }));
+  const [delta, setDelta] = useState<Delta>({
+    x: defaultDelta,
+    y: 0,
+  });
 
-      const canvas = canvasRef.current!;
-      const ctx = canvas.getContext("2d")!;
+  const tick = useCallback(() => {
+    setCurrentPos((p) => ({ x: p.x + delta.x, y: p.y }));
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
 
-      ctx.arc(
-        currentPos.x,
-        currentPos.y,
-        sphereRadius,
-        0,
-        2 * Math.PI
-      );
-      ctx.fillStyle = "orange";
-      ctx.fill();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const nextDelta = { x: 0, y: 0 };
-      if (currentPos.x > canvas.width - 2 * sphereRadius) {
-        nextDelta.x = -0.1;
-      } else {
-        nextDelta.x = 0.1;
-      }
-      if (currentPos.y > canvas.height - 2 * sphereRadius) {
-        nextDelta.y = -0.1;
-      } else {
-        nextDelta.y = 0.1;
-      }
+    ctx.arc(
+      currentPos.x,
+      currentPos.y,
+      sphereRadius,
+      0,
+      2 * Math.PI
+    );
+    ctx.fillStyle = "orange";
+    ctx.fill();
 
-      requestIdRef.current = requestAnimationFrame(() =>
-        tick(nextDelta)
-      );
-    },
-    [currentPos]
-  );
+    if (currentPos.x > 300 - 2 * sphereRadius) {
+      setDelta((d) => ({ ...d, x: -defaultDelta }));
+    } else if (currentPos.x < 0) {
+      setDelta((d) => ({ ...d, x: defaultDelta }));
+    }
+
+    requestIdRef.current = requestAnimationFrame(tick);
+  }, [currentPos, delta.x]);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     setupGridWidthHeightAndScale(400, 400, canvas);
 
-    requestIdRef.current = requestAnimationFrame(() =>
-      tick()
-    );
+    requestIdRef.current = requestAnimationFrame(tick);
 
     return () =>
       cancelAnimationFrame(requestIdRef.current!);
