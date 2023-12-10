@@ -1,5 +1,10 @@
 export const TwoPI = 2 * Math.PI;
 
+export type CanvasProps = {
+  width: number;
+  height: number;
+};
+
 export function setupGridWidthHeightAndScale(
   width: number,
   height: number,

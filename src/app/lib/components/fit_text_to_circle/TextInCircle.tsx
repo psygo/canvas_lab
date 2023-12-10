@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 
 import {
-  TwoPI,
+  CanvasProps,
   setupGridWidthHeightAndScale,
 } from "../utils/canvas_utils";
 
@@ -13,21 +13,17 @@ const DEFAULT_FONT_SIZE = 64; // In pixels. Font is scaled to fit so that font s
 const MAX_SCALE = 2; // Max font scale used
 const DEFAULT_FONT_HEIGHT = DEFAULT_FONT_SIZE * 1.2;
 
-type CanvasProps = {
-  width: number;
-  height: number;
-};
 /**
  * From [Mike Bostock's Tutorial](https://observablehq.com/@mbostock/fit-text-to-circle).
  *
  * Related to [Issue #433 on React Force Graph](https://github.com/vasturiano/react-force-graph/issues/433#issuecomment-1810210106).
+ *
+ * Answer supplied by [this answer](https://stackoverflow.com/q/77579242/4756173)
  */
 export function TextInCircle({
   width,
   height,
 }: CanvasProps) {
-  const [typedText, setTypedText] = useState("");
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   function getContext() {
@@ -128,6 +124,8 @@ export function TextInCircle({
   ) {
     let scale, line;
     ctx.fillStyle = circleColor;
+    // Trying to fix the first frame
+    // ctx.clearRect(0, 0, width * window.devicePixelRatio, height * window.devicePixelRatio)
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.fill();
